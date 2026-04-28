@@ -431,22 +431,104 @@
                 });
 
                 // ОТПРАВКА СООБЩЕНИЙ
-                const sendMsg = () => {
-                    const inp=document.getElementById('messageInput'), text=inp.value.trim();
-                    if(!text||!state.currentChat) return;
-                    const chat=state.chats.find(c=>c.id===state.currentChat);
-                    if(!chat) return;
-                    if(chat.type==='channel'&&chat.admin!==state.user.phone) return toast('Только админ пишет в канал','warning');
+               const sendMsg = () => {
+    const inp = document.getElementById('messageInput');
+    const text = inp.value.trim();
+    if (!text || !state.currentChat) return;
+    
+    const chat = state.chats.find(c => c.id === state.currentChat);
+    if (!chat) return;
+    
+    if (chat.type === 'channel' && chat.admin !== state.user.phone) {
+        return toast('Только админ пишет в канал', 'warning');
+    }
 
-                    const msg={ id:genId(), sender:state.user.phone, text, time:Date.now(), type:'text', deleted:false };
-                    if(!state.messages[chat.id]) state.messages[chat.id]=[];
-                    state.messages[chat.id].push(msg);
+    // Создаём сообщение
+    const msg = {
+        id: genId(),
+        sender: state.user.phone,
+        text: text,
+        time: Date.now(),
+        type: 'text',
+        deleted: false,
+        senderName: state.user.name,
+        senderUsername: state.user.username
+    };
 
-                    // Отправка через сервер
-                    if(socket){
-                        if(chat.id==='general'){
-                            socket.emit('message:general', { text, fromPhone:state.user.phone, fromName:state.user.name, fromUsername:state.user.username });
-                        } else if(chat.type==='private'){
+    // Сохраняем локально
+    if (!state.messages[chat.id]) state.messages[chat.id] = [];
+    state.messages[chat.id].push(msg);
+    save();
+    renderMessages();
+    renderChatList();
+    inp.value = '';
+
+    // ОТПРАВЛЯЕМ ЧЕРЕЗ СЕРВЕР (ЭТО ГЛАВНОЕ!)
+    if (socket && socket.connected) {
+        if (chat.id === 'general') {
+            // Отправка в общий чат
+            socket.emit('message:general', {
+                text: text,
+                fromPhone: state.user.phone,
+                fromName: state.user.name,
+                fromUsername: state.user.username
+            });
+            console.log('📤 Отправлено в общий чат:', text);
+        } else if (chat.type === 'private') {
+            // Отправка в личный чат
+            const otherPhone = chat.participants.find(p => p !== state.user.phone);
+            if (otherPhone) {
+                socket.emit('message:send', {
+                    to: otherPhone,
+                    chatId: chat.id,
+                    text: text,
+                    fromPhone: state.user.phone,
+                    fromName: state.user.name,
+                    fromUsername: state.user.username
+                });
+                console.log('📤 Отправлено пользователю:', otherPhone, text);
+            }
+        } else if (chat.type === 'group') {
+            // Отправка в группу
+            chat.participants.forEach(p => {
+                if (p !== state.user.phone) {
+                    socket.emit('message:send', {
+                        to: p,
+                        chatId: chat.id,
+                        text: text,
+                        fromPhone: state.user.phone,
+                        fromName: state.user.name,
+                        fromUsername: state.user.username
+                    });
+                }
+            });
+            console.log('📤 Отправлено в группу:', text);
+        }
+    } else {
+        console.log('❌ Сервер не подключен!');
+        toast('Сервер недоступен. Сообщение сохранено локально.', 'warning');
+    }
+
+    // Ответ бота (только в личном чате с ботом)
+    if (chat.type === 'private' && chat.participants.includes('+79991112233')) {
+        setTimeout(() => {
+            const replies = ['👍', 'Интересно!', 'Понял', 'Используй поиск 🔍', 'Зайди в общий чат 🌍'];
+            const botMsg = {
+                id: genId(),
+                sender: '+79991112233',
+                text: replies[Math.floor(Math.random() * replies.length)],
+                time: Date.now(),
+                type: 'text',
+                deleted: false
+            };
+            if (!state.messages[chat.id]) state.messages[chat.id] = [];
+            state.messages[chat.id].push(botMsg);
+            save();
+            if (state.currentChat === chat.id) renderMessages();
+            renderChatList();
+        }, 800 + Math.random() * 1500);
+    }
+};
                             const other=chat.participants.find(p=>p!==state.user.phone);
                             if(other) socket.emit('message:send', { to:other, chatId:chat.id, text, fromPhone:state.user.phone, fromName:state.user.name, fromUsername:state.user.username });
                         }
