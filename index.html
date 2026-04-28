@@ -3,476 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>KChat • Мессенджер</title>
+    <title>KChat Pro • Мессенджер</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
-        body{background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh}
-        .container{background:white;border-radius:16px;padding:20px;width:90%;max-width:500px;box-shadow:0 4px 16px rgba(0,0,0,0.1)}
-        h1{text-align:center;color:#667eea;margin-bottom:16px}
-        input,button{padding:12px;border-radius:8px;font-size:16px;width:100%;margin:6px 0}
-        input{border:1px solid #ddd}
-        button{background:#667eea;color:white;border:none;cursor:pointer;font-weight:bold}
-        button:hover{background:#5a6fd6}
-        button.green{background:#31a24c}
-        button.orange{background:#ff9f43}
-        button.red{background:#ff4444}
-        .msg{background:#f0f0f0;padding:8px 12px;border-radius:8px;margin:4px 0;word-break:break-word}
-        .msg .sender{font-weight:bold;color:#667eea;font-size:12px}
-        .msg .time{font-size:10px;color:#999;float:right}
-        #messages{max-height:400px;overflow-y:auto;margin:12px 0;padding:8px;background:#fafafa;border-radius:8px}
-        .tabs{display:flex;gap:4px;margin:8px 0;flex-wrap:wrap}
-        .tab{flex:1;min-width:60px;padding:8px;text-align:center;background:#eee;border-radius:6px;cursor:pointer;font-size:12px}
-        .tab.active{background:#667eea;color:white}
-        #status{text-align:center;font-size:12px;margin:4px 0}
-        .online{color:#31a24c}
-        .offline{color:#999}
-        .user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;margin:2px 0;background:#f9f9f9;border-radius:6px;font-size:14px}
-        .user-row:hover{background:#eee}
+        * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+        :root { --bg:#fff; --bg2:#f0f2f5; --bg3:#f7f9fc; --text:#1a1a1a; --text2:#65676b; --blue:#0084ff; --green:#31a24c; --red:#ff4444; --orange:#ff9f43; --purple:#8b5cf6; --bubble-in:#e4e6eb; --bubble-out:#0084ff; --border:#dadde1; --t:0.3s cubic-bezier(0.4,0,0.2,1); }
+        body.dark { --bg:#1a1a1a; --bg2:#0a0a0a; --bg3:#2a2a2a; --text:#e4e6eb; --text2:#b0b3b8; --bubble-in:#3a3b3c; --border:#3e4042; }
+        body { width:100vw; height:100vh; overflow:hidden; background:var(--bg2); color:var(--text); font-size:15px; -webkit-tap-highlight-color:transparent; }
+        #app { width:100%; height:100%; display:flex; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes scaleIn { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+        @keyframes msgIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+        .auth-screen { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#667eea,#764ba2); padding:16px; animation:fadeIn 0.5s; }
+        .auth-card { background:var(--bg); border-radius:24px; padding:28px 24px; width:100%; max-width:400px; box-shadow:0 16px 40px rgba(0,0,0,0.25); animation:scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+        .auth-card h1 { text-align:center; font-size:2.2rem; background:linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+        .subtitle { text-align:center; color:var(--text2); margin-bottom:16px; font-size:0.9rem; }
+        .input-group { margin-bottom:10px; }
+        .input-group label { display:block; font-size:0.85rem; font-weight:600; margin-bottom:4px; color:var(--text2); }
+        .input-group input { width:100%; padding:13px 15px; border:2px solid var(--border); border-radius:12px; font-size:1rem; background:var(--bg3); color:var(--text); outline:none; transition:all var(--t); }
+        .input-group input:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,132,255,0.1); }
+        .btn { width:100%; padding:13px; border:none; border-radius:12px; font-size:1rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:all var(--t); margin-top:8px; position:relative; overflow:hidden; }
+        .btn:active { transform:scale(0.97); }
+        .btn-primary { background:linear-gradient(135deg,#667eea,#764ba2); color:white; box-shadow:0 4px 12px rgba(102,126,234,0.3); }
+        .btn-primary:hover { transform:translateY(-2px); }
+        .btn-outline { background:transparent; border:2px solid var(--border); color:var(--text); }
+        .btn-sm { padding:8px 14px; width:auto; font-size:0.85rem; border-radius:10px; }
+
+        .main-layout { display:flex; width:100%; height:100%; animation:fadeIn 0.4s; }
+        .sidebar { width:380px; background:var(--bg); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+        .sidebar-header { padding:14px; border-bottom:1px solid var(--border); }
+        .profile-bar { display:flex; align-items:center; gap:10px; margin-bottom:10px; padding:10px; border-radius:14px; cursor:pointer; transition:all var(--t); }
+        .profile-bar:hover { background:var(--bg3); }
+        .avatar { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2); display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:white; flex-shrink:0; }
+        .profile-info { flex:1; }
+        .profile-name { font-weight:700; font-size:1rem; }
+        .profile-username { font-size:0.8rem; color:var(--blue); }
+        .action-btns { display:flex; gap:6px; margin-bottom:10px; }
+        .action-btn { flex:1; padding:10px 6px; border:none; border-radius:10px; background:var(--bg3); color:var(--text); cursor:pointer; font-size:0.82rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; transition:all var(--t); }
+        .action-btn:hover { background:var(--blue); color:white; }
+        .search-box { display:flex; align-items:center; background:var(--bg3); border-radius:24px; padding:10px 14px; gap:8px; border:1px solid var(--border); }
+        .search-box input { flex:1; background:none; border:none; outline:none; font-size:0.95rem; color:var(--text); }
+        .chat-list { flex:1; overflow-y:auto; padding:6px; }
+        .chat-item { display:flex; align-items:center; gap:10px; padding:12px; border-radius:14px; cursor:pointer; transition:all var(--t); margin-bottom:3px; animation:slideUp 0.3s ease backwards; }
+        .chat-item:hover { background:var(--bg3); transform:translateX(3px); }
+        .chat-item.active { background:var(--blue); color:white; }
+        .chat-item-info { flex:1; min-width:0; }
+        .chat-item-name { font-weight:600; font-size:0.95rem; }
+        .chat-item-msg { font-size:0.82rem; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .chat-item.active .chat-item-msg { color:rgba(255,255,255,0.8); }
+        .unread-badge { background:var(--blue); color:white; border-radius:10px; padding:2px 7px; font-size:0.7rem; font-weight:700; margin-left:4px; }
+
+        .chat-area { flex:1; display:flex; flex-direction:column; background:var(--bg2); }
+        .chat-header { padding:12px 16px; background:var(--bg); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+        .chat-title { flex:1; font-weight:700; font-size:1rem; }
+        .chat-subtitle { font-size:0.78rem; color:var(--text2); }
+        .icon-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--bg3); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; transition:all var(--t); }
+        .icon-btn:hover { background:var(--blue); color:white; }
+        .messages-area { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:6px; scroll-behavior:smooth; }
+        .msg { display:flex; max-width:72%; animation:msgIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        .msg.in { align-self:flex-start; }
+        .msg.out { align-self:flex-end; }
+        .msg-bubble { padding:10px 14px; border-radius:20px; word-break:break-word; font-size:0.95rem; }
+        .msg.in .msg-bubble { background:var(--bubble-in); color:var(--text); border-bottom-left-radius:6px; }
+        .msg.out .msg-bubble { background:var(--bubble-out); color:white; border-bottom-right-radius:6px; }
+        .msg-sender { font-size:0.7rem; margin-bottom:2px; color:var(--blue); font-weight:700; }
+        .msg-time { font-size:0.65rem; opacity:0.7; margin-top:4px; text-align:right; }
+        .input-bar { padding:12px 16px; background:var(--bg); border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; }
+        .input-bar input { flex:1; padding:11px 15px; border:2px solid var(--border); border-radius:24px; font-size:1rem; background:var(--bg3); color:var(--text); outline:none; }
+        .input-bar input:focus { border-color:var(--blue); }
+        .empty-state { text-align:center; padding:50px 20px; color:var(--text2); animation:fadeIn 0.5s; }
+        .empty-state i { font-size:3.5rem; opacity:0.2; margin-bottom:12px; animation:float 3s ease-in-out infinite; }
+
+        .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px; animation:fadeIn 0.2s; }
+        .modal { background:var(--bg); border-radius:20px; padding:22px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.2); animation:scaleIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+        .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+        .modal-header h3 { font-size:1.15rem; }
+        .modal-close { width:32px; height:32px; border-radius:50%; border:none; background:var(--bg3); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; transition:all var(--t); }
+        .modal-close:hover { background:var(--red); color:white; transform:rotate(90deg); }
+        .user-list-item { display:flex; align-items:center; gap:12px; padding:14px; border-radius:12px; cursor:pointer; transition:all var(--t); }
+        .user-list-item:hover { background:var(--bg3); transform:translateX(3px); }
+
+        .toast { position:fixed; top:16px; left:50%; transform:translateX(-50%); background:var(--bg); border-radius:12px; padding:13px 20px; box-shadow:0 8px 24px rgba(0,0,0,0.2); z-index:2000; border-left:4px solid var(--blue); font-size:0.9rem; white-space:nowrap; animation:slideUp 0.3s; }
+        .toast.success { border-left-color:var(--green); }
+        .toast.error { border-left-color:var(--red); }
+
+        .online-count { padding:8px 12px; border-top:1px solid var(--border); font-size:0.8rem; color:var(--text2); }
+
+        @media (max-width:768px) {
+            .sidebar { width:100%; position:fixed; left:-100%; top:0; height:100%; z-index:100; transition:left var(--t); }
+            .sidebar.open { left:0; }
+            .msg { max-width:85%; }
+            .modal { width:95%; }
+        }
+        @media (min-width:769px) {
+            .toast { left:auto; right:16px; transform:none; }
+        }
     </style>
 </head>
 <body>
-    <div class="container" id="app"></div>
+    <div id="app"></div>
 
     <script>
-        const SERVER_URL = 'https://kchat-j89m.onrender.com';
-        let socket;
-        let currentUser = null;
-        let currentChat = 'general';
-        let messages = {};
-        let allUsers = [];
-        let chats = [];
+        (function() {
+            const SERVER_URL = 'https://kchat-j89m.onrender.com';
+            const DEMO_CODE = '12345';
+            let socket;
 
-        // ====== ПОДКЛЮЧЕНИЕ К СЕРВЕРУ ======
-        function connectServer() {
-            try {
-                socket = io(SERVER_URL);
-                
-                socket.on('connect', () => {
-                    console.log('✅ Подключены к серверу');
-                    updateStatus(true);
-                    if (currentUser) registerOnServer();
-                });
-
-                socket.on('disconnect', () => updateStatus(false));
-
-                socket.on('users:update', (users) => {
-                    if (users && users.length > 0) allUsers = users;
-                    updateStatus(true);
-                });
-
-                socket.on('message:general', (data) => {
-                    if (!messages['general']) messages['general'] = [];
-                    messages['general'].push({
-                        id: Date.now().toString(),
-                        sender: data.fromPhone,
-                        text: data.text,
-                        time: data.time || Date.now(),
-                        senderName: data.fromName || 'Пользователь',
-                        senderUsername: data.fromUsername || 'user'
-                    });
-                    saveData();
-                    if (currentChat === 'general') renderMessages();
-                });
-
-                socket.on('message:private', (data) => {
-                    const chatId = data.chatId;
-                    if (!messages[chatId]) messages[chatId] = [];
-                    messages[chatId].push({
-                        id: Date.now().toString(),
-                        sender: data.fromPhone,
-                        text: data.text,
-                        time: data.time || Date.now(),
-                        senderName: data.fromName || 'Пользователь',
-                        senderUsername: data.fromUsername || 'user'
-                    });
-                    saveData();
-                    if (currentChat === chatId) renderMessages();
-                    renderChatList();
-                });
-
-                socket.on('user:searchResults', (results) => {
-                    if (results && results.length > 0) allUsers = results;
-                });
-
-            } catch(e) {
-                console.log('Сервер недоступен:', e.message);
-                updateStatus(false);
-            }
-        }
-
-        function registerOnServer() {
-            if (socket && socket.connected && currentUser) {
-                socket.emit('register', {
-                    phone: currentUser.phone,
-                    name: currentUser.name,
-                    username: currentUser.username,
-                    avatar: currentUser.avatar
-                });
-            }
-        }
-
-        function updateStatus(connected) {
-            const el = document.getElementById('status');
-            if (el) {
-                el.innerHTML = connected ? '<span class="online">🟢 Сервер подключен</span>' : '<span class="offline">⚫ Локальный режим</span>';
-            }
-        }
-
-        function saveData() {
-            localStorage.setItem('kchat_msgs', JSON.stringify(messages));
-            localStorage.setItem('kchat_chats', JSON.stringify(chats));
-        }
-
-        function loadData() {
-            try {
-                const msgs = localStorage.getItem('kchat_msgs');
-                const chts = localStorage.getItem('kchat_chats');
-                if (msgs) messages = JSON.parse(msgs);
-                if (chts) chats = JSON.parse(chts);
-            } catch(e) {}
-            
-            if (!messages['general']) messages['general'] = [];
-            if (!messages['bot_chat']) {
-                messages['bot_chat'] = [{
-                    id: 'welcome',
-                    sender: '+79991112233',
-                    text: '👋 Привет! Я бот. Используй поиск чтобы найти людей!',
-                    time: Date.now(),
-                    senderName: '🤖 Бот',
-                    senderUsername: 'bot'
-                }];
-            }
-        }
-
-        // ====== АВТОРИЗАЦИЯ ======
-        function showAuth() {
-            loadData();
-            document.getElementById('app').innerHTML = `
-                <h1>🚀 KChat</h1>
-                <p style="text-align:center;color:#666;margin-bottom:12px">Поиск по @username • Общий чат • Личные сообщения</p>
-                <input type="tel" id="phoneInput" placeholder="Номер телефона" value="+79001234567">
-                <input type="text" id="codeInput" placeholder="Код подтверждения" value="12345" maxlength="5">
-                <input type="text" id="nameInput" placeholder="Ваше имя" value="Александр">
-                <input type="text" id="usernameInput" placeholder="@username" value="alex">
-                <button onclick="login()">🚀 Войти</button>
-                <p style="text-align:center;color:#999;font-size:12px;margin-top:8px">Код: 12345 | Готовые: alex, maria, dima, elena</p>
-            `;
-        }
-
-        function login() {
-            const phone = document.getElementById('phoneInput').value.trim();
-            const code = document.getElementById('codeInput').value.trim();
-            const name = document.getElementById('nameInput').value.trim();
-            const username = document.getElementById('usernameInput').value.trim();
-
-            if (!phone || code !== '12345') return alert('Код: 12345');
-            if (!name || !username) return alert('Заполните все поля');
-
-            currentUser = { phone, name, username, avatar: '😎', status: 'В сети' };
-            localStorage.setItem('kchat_user', JSON.stringify(currentUser));
-            
-            connectServer();
-            registerOnServer();
-            showMain();
-        }
-
-        // ====== ГЛАВНЫЙ ЭКРАН ======
-        function showMain() {
-            if (!currentUser) { showAuth(); return; }
-
-            document.getElementById('app').innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <h2 style="margin:0;font-size:18px">💬 @${currentUser.username}</h2>
-                    <span style="font-size:12px">${currentUser.name}</span>
-                </div>
-                <div id="status">Подключение...</div>
-                <div class="tabs" id="tabs">
-                    <div class="tab active" data-chat="general">🌍 Общий</div>
-                    <div class="tab" data-chat="bot_chat">🤖 Бот</div>
-                </div>
-                <div id="chatTitle" style="font-weight:bold;margin:6px 0;font-size:15px"></div>
-                <div id="messages"></div>
-                <div style="display:flex;gap:8px">
-                    <input type="text" id="msgInput" placeholder="Сообщение..." style="flex:1">
-                    <button onclick="sendMessage()" style="width:auto;padding:12px 20px">➤</button>
-                </div>
-                <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
-                    <button onclick="showSearch()" class="green" style="width:auto;font-size:13px;padding:8px 12px">🔍 Поиск людей</button>
-                    <button onclick="showUsers()" class="orange" style="width:auto;font-size:13px;padding:8px 12px">👥 Контакты</button>
-                    <button onclick="logout()" class="red" style="width:auto;font-size:13px;padding:8px 12px">🚪</button>
-                </div>
-                <div id="chatList" style="margin-top:8px"></div>
-            `;
-
-            updateStatus(socket && socket.connected);
-            updateChatTitle();
-            renderMessages();
-            renderChatList();
-            renderChatTabs();
-
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    currentChat = tab.dataset.chat;
-                    updateChatTitle();
-                    renderMessages();
-                });
-            });
-
-            // Enter для отправки
-            const msgInput = document.getElementById('msgInput');
-            if (msgInput) {
-                msgInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') sendMessage();
-                });
-            }
-        }
-
-        function updateChatTitle() {
-            const el = document.getElementById('chatTitle');
-            if (!el) return;
-            const titles = { 'general': '🌍 Общий чат', 'bot_chat': '🤖 Чат с ботом' };
-            el.textContent = titles[currentChat] || '💬 Чат';
-        }
-
-        function renderChatTabs() {
-            const container = document.getElementById('tabs');
-            if (!container) return;
-            
-            // Добавляем вкладки для личных чатов
-            const personalChats = chats.filter(c => c.type === 'private');
-            personalChats.forEach(chat => {
-                const other = chat.participants.find(p => p !== currentUser.phone);
-                const user = allUsers.find(u => u.phone === other) || { name: 'Контакт' };
-                const tab = document.createElement('div');
-                tab.className = 'tab';
-                tab.dataset.chat = chat.id;
-                tab.textContent = '💬 ' + user.name.split(' ')[0];
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    currentChat = chat.id;
-                    updateChatTitle();
-                    renderMessages();
-                });
-                container.appendChild(tab);
-            });
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('msgInput');
-            const text = input.value.trim();
-            if (!text || !currentUser) return;
-
-            const msg = {
-                id: Date.now().toString(),
-                sender: currentUser.phone,
-                text: text,
-                time: Date.now(),
-                senderName: currentUser.name,
-                senderUsername: currentUser.username
+            const state = {
+                user: null,
+                allUsers: [],
+                chats: [],
+                messages: {},
+                currentChat: null,
+                theme: 'light',
+                onlineUsers: []
             };
 
-            if (!messages[currentChat]) messages[currentChat] = [];
-            messages[currentChat].push(msg);
-            renderMessages();
-            input.value = '';
-            saveData();
+            function save() { localStorage.setItem('kchat_state', JSON.stringify(state)); }
+            function toast(msg, type='info') { const t=document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
+            function genId() { return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
+            function fTime(ts) { const d=new Date(ts); if(d.toDateString()===new Date().toDateString()) return d.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}); return d.toLocaleDateString('ru',{day:'2-digit',month:'2-digit'}); }
+            function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m=>m.remove()); }
 
-            // Отправка через сервер
-            if (socket && socket.connected) {
-                if (currentChat === 'general') {
-                    socket.emit('message:general', {
-                        text: text,
-                        fromPhone: currentUser.phone,
-                        fromName: currentUser.name,
-                        fromUsername: currentUser.username
+            function connectServer() {
+                try {
+                    socket = io(SERVER_URL);
+                    socket.on('connect', () => { if(state.user) socket.emit('register',{phone:state.user.phone,name:state.user.name,username:state.user.username,avatar:state.user.avatar}); });
+                    socket.on('users:update', users => { state.allUsers = users; state.onlineUsers = users.filter(u=>u.online); updateOnlineCount(); });
+                    socket.on('message:general', data => {
+                        if(!state.messages['general']) state.messages['general']=[];
+                        state.messages['general'].push({id:genId(),sender:data.fromPhone,text:data.text,time:data.time||Date.now(),senderName:data.fromName,senderUsername:data.fromUsername,type:'text',deleted:false});
+                        save(); if(state.currentChat==='general') renderMessages(); renderChatList();
                     });
-                } else {
-                    const otherPhone = currentChat === 'bot_chat' ? '+79991112233' : 
-                        (chats.find(c => c.id === currentChat)?.participants?.find(p => p !== currentUser.phone));
-                    if (otherPhone) {
-                        socket.emit('message:send', {
-                            to: otherPhone,
-                            chatId: currentChat,
-                            text: text,
-                            fromPhone: currentUser.phone,
-                            fromName: currentUser.name,
-                            fromUsername: currentUser.username
-                        });
-                    }
-                }
-            }
-
-            // Ответ бота
-            if (currentChat === 'bot_chat') {
-                setTimeout(() => {
-                    const replies = ['👍', 'Интересно!', 'Понял', 'Ищи людей через поиск 🔍', 'Общий чат ждёт!'];
-                    messages[currentChat].push({
-                        id: Date.now().toString(),
-                        sender: '+79991112233',
-                        text: replies[Math.floor(Math.random() * replies.length)],
-                        time: Date.now(),
-                        senderName: '🤖 Бот',
-                        senderUsername: 'bot'
+                    socket.on('message:private', data => {
+                        if(!state.messages[data.chatId]) state.messages[data.chatId]=[];
+                        state.messages[data.chatId].push({id:genId(),sender:data.fromPhone,text:data.text,time:data.time||Date.now(),senderName:data.fromName,senderUsername:data.fromUsername,type:'text',deleted:false});
+                        const chat=state.chats.find(c=>c.id===data.chatId);
+                        if(chat&&state.user) chat.unread[state.user.phone]=(chat.unread[state.user.phone]||0)+1;
+                        save(); if(state.currentChat===data.chatId) renderMessages(); renderChatList();
                     });
-                    saveData();
-                    renderMessages();
-                }, 1000);
-            }
-        }
-
-        function renderMessages() {
-            const container = document.getElementById('messages');
-            if (!container) return;
-
-            const msgs = messages[currentChat] || [];
-            if (msgs.length === 0) {
-                container.innerHTML = '<p style="color:#999;text-align:center;padding:20px">Нет сообщений. Напишите первое!</p>';
-                return;
+                    socket.on('user:searchResults', results => { if(results&&results.length>0) state.allUsers=results; });
+                } catch(e) { console.log('Сервер недоступен'); }
             }
 
-            container.innerHTML = msgs.map(m => {
-                const isMe = m.sender === currentUser.phone;
-                return `<div class="msg" style="background:${isMe?'#667eea':'#f0f0f0'};color:${isMe?'white':'black'}">
-                    <div class="sender" style="color:${isMe?'rgba(255,255,255,0.8)':'#667eea'}">${isMe?'Я':m.senderName||'Пользователь'} @${m.senderUsername||''}</div>
-                    ${m.text}
-                    <div class="time">${new Date(m.time).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</div>
-                </div>`;
-            }).join('');
+            function updateOnlineCount() { const el=document.getElementById('onlineCount'); if(el) el.textContent=`🟢 Онлайн: ${state.onlineUsers.length}`; }
 
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function renderChatList() {
-            const container = document.getElementById('chatList');
-            if (!container) return;
-
-            const personal = chats.filter(c => c.type === 'private' && c.id !== currentChat);
-            if (personal.length === 0) {
-                container.innerHTML = '<p style="color:#999;font-size:11px;margin-top:8px">Нет личных чатов. Нажмите 🔍 Поиск</p>';
-                return;
-            }
-
-            container.innerHTML = '<b style="font-size:12px">Ваши чаты:</b>' + personal.map(c => {
-                const other = c.participants.find(p => p !== currentUser.phone);
-                const user = allUsers.find(u => u.phone === other) || { name: 'Контакт', username: 'user' };
-                return `<button onclick="openChat('${c.id}')" style="width:auto;font-size:11px;padding:6px 8px;margin:2px;display:inline-block">💬 ${user.name} (@${user.username})</button>`;
-            }).join('');
-        }
-
-        function openChat(chatId) {
-            currentChat = chatId;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            showMain();
-        }
-
-        // ====== ПОИСК ======
-        function showSearch() {
-            const list = allUsers.length > 0 ? allUsers : [
-                {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
-                {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false},
-                {phone:'+79363334455',name:'Елена',username:'elena',avatar:'👩',online:true},
-                {phone:'+79991112233',name:'🤖 Бот',username:'bot',avatar:'🤖',online:true}
-            ];
-
-            const avaliable = list.filter(u => u.phone !== currentUser.phone);
-            
-            const html = avaliable.map((u, i) => 
-                `${i+1}. ${u.name} @${u.username} ${u.online?'🟢':'⚫'}`
-            ).join('\n');
-
-            const choice = prompt('🔍 Доступные пользователи:\n\n' + html + '\n\nВведите номер чтобы начать чат:');
-            
-            if (choice && avaliable[parseInt(choice)-1]) {
-                const user = avaliable[parseInt(choice)-1];
-                startChat(user.phone, user.name, user.username);
-            }
-        }
-
-        function showUsers() {
-            const list = allUsers.length > 0 ? allUsers : [
-                {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
-                {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false}
-            ];
-
-            let html = '<div style="max-height:200px;overflow-y:auto">';
-            list.filter(u => u.phone !== currentUser.phone).forEach(u => {
-                const hasChat = chats.some(c => c.type==='private' && c.participants.includes(u.phone));
-                html += `<div class="user-row">
-                    <span>${u.avatar} <b>${u.name}</b> @${u.username} ${u.online?'🟢':'⚫'}</span>
-                    <button onclick="startChat('${u.phone}','${u.name}','${u.username}')" style="width:auto;font-size:11px;padding:4px 8px">${hasChat?'💬 Открыть':'➕ Чат'}</button>
-                </div>`;
-            });
-            html += '</div>';
-
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000';
-            overlay.innerHTML = `<div style="background:white;padding:20px;border-radius:12px;width:90%;max-width:400px">
-                <h3>👥 Контакты</h3>${html}
-                <button onclick="this.parentElement.parentElement.remove()" style="margin-top:8px">Закрыть</button>
-            </div>`;
-            document.body.appendChild(overlay);
-            overlay.addEventListener('click', (e) => { if(e.target===overlay) overlay.remove(); });
-        }
-
-        function startChat(phone, name, username) {
-            const chatId = 'chat_' + [currentUser.phone, phone].sort().join('_');
-            
-            if (chats.some(c => c.id === chatId)) {
-                currentChat = chatId;
-                showMain();
-                return;
-            }
-
-            chats.push({
-                id: chatId,
-                type: 'private',
-                participants: [currentUser.phone, phone]
-            });
-
-            messages[chatId] = [{
-                id: Date.now().toString(),
-                sender: currentUser.phone,
-                text: `👋 Привет, @${username}!`,
-                time: Date.now(),
-                senderName: currentUser.name,
-                senderUsername: currentUser.username
-            }];
-
-            currentChat = chatId;
-            saveData();
-            showMain();
-        }
-
-        function logout() {
-            if (confirm('Выйти?')) {
-                currentUser = null;
-                currentChat = 'general';
-                localStorage.removeItem('kchat_user');
-                showAuth();
-            }
-        }
-
-        // ====== ЗАПУСК ======
-        const saved = localStorage.getItem('kchat_user');
-        if (saved) {
-            try {
-                currentUser = JSON.parse(saved);
-                loadData();
+            function init() {
+                const saved=localStorage.getItem('kchat_state');
+                if(saved){ try{ const d=JSON.parse(saved); state.chats=d.chats||[]; state.messages=d.messages||{}; state.theme=d.theme||'light'; }catch(e){} }
+                if(!state.messages['general']) state.messages['general']=[];
+                if(!state.chats.find(c=>c.id==='general')) state.chats.unshift({id:'general',type:'group',name:'🌍 Общий чат',avatar:'🌍',participants:[],unread:{},pinned:true,isGeneral:true});
+                if(!state.chats.find(c=>c.id==='bot_chat')){ state.chats.push({id:'bot_chat',type:'private',participants:['+79991112233'],unread:{},pinned:false}); state.messages['bot_chat']=[{id:genId(),sender:'+79991112233',text:'Привет! Используй 🔍 Поиск чтобы найти людей по @username!',time:Date.now(),senderName:'🤖 Бот',senderUsername:'bot',type:'text',deleted:false}]; }
+                if(state.theme==='dark') document.body.classList.add('dark');
                 connectServer();
-                showMain();
-            } catch(e) {
-                showAuth();
+                render();
             }
-        } else {
-            showAuth();
-        }
 
-        console.log('✅ KChat готов! Сервер: ' + SERVER_URL);
+            function render() { document.getElementById('app').innerHTML = state.user ? renderMain() : renderAuth(); if(state.user){ attachMain(); renderChatList(); updateOnlineCount(); if(state.currentChat) openChat(state.currentChat); } else { attachAuth(); } }
+
+            function renderAuth() {
+                return `<div class="auth-screen"><div class="auth-card"><h1>KChat Pro</h1><p class="subtitle">Поиск по @username • Общий чат</p>
+                <div class="input-group"><label>📱 Номер телефона</label><input type="tel" id="phoneInput" value="+79001234567"></div>
+                <div class="input-group"><label>🔐 Код (12345)</label><input type="text" id="codeInput" value="12345" maxlength="5"></div>
+                <div class="input-group"><label>👤 Имя</label><input type="text" id="nameInput" value="Александр"></div>
+                <div class="input-group"><label>@ Username</label><input type="text" id="usernameInput" value="alex" autocapitalize="none"></div>
+                <button class="btn btn-primary" id="loginBtn">🚀 Войти</button>
+                <p style="text-align:center;color:var(--text2);font-size:0.8rem;margin-top:8px;">Готовые: alex, maria, dima, elena, bot</p></div></div>`;
+            }
+
+            function attachAuth() {
+                document.getElementById('loginBtn')?.addEventListener('click',()=>{
+                    const phone=document.getElementById('phoneInput').value.trim();
+                    const code=document.getElementById('codeInput').value.trim();
+                    const name=document.getElementById('nameInput').value.trim();
+                    const username=document.getElementById('usernameInput').value.trim();
+                    if(!phone||code!==DEMO_CODE) return toast('Код: 12345','error');
+                    if(!name||!username) return toast('Заполните все поля','error');
+                    const avatars=['😎','🐱','🦊','🐼','🐸','🐧','🦁','🤖'];
+                    state.user={phone,name,username,avatar:avatars[Math.floor(Math.random()*avatars.length)],status:'В сети'};
+                    if(!state.chats.find(c=>c.id==='bot_chat')){ state.chats.push({id:'bot_chat',type:'private',participants:[phone,'+79991112233'],unread:{},pinned:false}); state.messages['bot_chat']=[{id:genId(),sender:'+79991112233',text:`Привет, @${username}! Используй поиск!`,time:Date.now(),senderName:'🤖 Бот',senderUsername:'bot',type:'text',deleted:false}]; }
+                    save();
+                    if(socket&&socket.connected) socket.emit('register',{phone,name,username,avatar:state.user.avatar});
+                    render(); toast(`Добро пожаловать, @${username}!`,'success');
+                });
+            }
+
+            function renderMain() {
+                const u=state.user;
+                return `<div class="main-layout">
+                    <div class="sidebar" id="sidebar"><div class="sidebar-header">
+                        <div class="profile-bar"><div class="avatar">${u.avatar}</div><div class="profile-info"><div class="profile-name">${u.name}</div><div class="profile-username">@${u.username}</div></div></div>
+                        <div class="action-btns"><button class="action-btn" id="searchBtn"><i class="fas fa-search"></i> Поиск</button><button class="action-btn" id="contactsBtn"><i class="fas fa-users"></i> Контакты</button></div>
+                    </div><div class="chat-list" id="chatList"></div><div class="online-count" id="onlineCount">🟢 Онлайн: ${state.onlineUsers.length}</div></div>
+                    <div class="chat-area"><div class="chat-header">
+                        <button class="icon-btn" id="menuBtn" style="display:none;"><i class="fas fa-bars"></i></button>
+                        <div class="avatar" id="chatAvatar" style="width:36px;height:36px;font-size:1rem;">💬</div>
+                        <div style="flex:1;"><div class="chat-title" id="chatName">Выберите чат</div><div class="chat-subtitle" id="chatStatus"></div></div>
+                        <button class="icon-btn" id="themeBtn"><i class="fas ${state.theme==='dark'?'fa-sun':'fa-moon'}"></i></button>
+                        <button class="icon-btn" id="logoutBtn" style="color:var(--red);"><i class="fas fa-sign-out-alt"></i></button>
+                    </div><div class="messages-area" id="messagesArea"><div class="empty-state"><i class="fas fa-comments"></i><p>Выберите чат</p></div></div>
+                    <div class="input-bar"><input type="text" id="msgInput" placeholder="Сообщение..." autocomplete="off"><button class="icon-btn" id="sendBtn" style="background:var(--blue);color:white;"><i class="fas fa-paper-plane"></i></button></div></div></div>`;
+            }
+
+            function attachMain() {
+                document.getElementById('menuBtn')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+                document.getElementById('searchBtn')?.addEventListener('click',showSearchModal);
+                document.getElementById('contactsBtn')?.addEventListener('click',showContactsModal);
+                document.getElementById('themeBtn')?.addEventListener('click',()=>{ state.theme=state.theme==='light'?'dark':'light'; document.body.classList.toggle('dark'); document.getElementById('themeBtn').innerHTML=`<i class="fas ${state.theme==='dark'?'fa-sun':'fa-moon'}"></i>`; save(); });
+                document.getElementById('logoutBtn')?.addEventListener('click',()=>{ if(confirm('Выйти?')){ state.user=null; state.currentChat=null; save(); render(); } });
+
+                const send=()=>{
+                    const inp=document.getElementById('msgInput'), text=inp.value.trim();
+                    if(!text||!state.currentChat) return;
+                    const chat=state.chats.find(c=>c.id===state.currentChat);
+                    if(!chat) return;
+                    const msg={id:genId(),sender:state.user.phone,text,time:Date.now(),senderName:state.user.name,senderUsername:state.user.username,type:'text',deleted:false};
+                    if(!state.messages[chat.id]) state.messages[chat.id]=[];
+                    state.messages[chat.id].push(msg);
+                    save(); renderMessages(); renderChatList(); inp.value='';
+
+                    if(socket&&socket.connected){
+                        if(chat.id==='general') socket.emit('message:general',{text,fromPhone:state.user.phone,fromName:state.user.name,fromUsername:state.user.username});
+                        else if(chat.type==='private'){ const other=chat.participants.find(p=>p!==state.user.phone); if(other) socket.emit('message:send',{to:other,chatId:chat.id,text,fromPhone:state.user.phone,fromName:state.user.name,fromUsername:state.user.username}); }
+                    }
+                    if(chat.id==='bot_chat'){ setTimeout(()=>{ const replies=['👍','Интересно!','Понял','Ищи людей через поиск 🔍']; state.messages[chat.id].push({id:genId(),sender:'+79991112233',text:replies[Math.floor(Math.random()*replies.length)],time:Date.now(),senderName:'🤖 Бот',senderUsername:'bot',type:'text',deleted:false}); save(); if(state.currentChat===chat.id) renderMessages(); renderChatList(); },1000); }
+                };
+                document.getElementById('sendBtn')?.addEventListener('click',send);
+                document.getElementById('msgInput')?.addEventListener('keypress',e=>{ if(e.key==='Enter') send(); });
+
+                if(window.innerWidth<=768) document.getElementById('menuBtn').style.display='flex';
+            }
+
+            function showSearchModal() {
+                const overlay=document.createElement('div'); overlay.className='modal-overlay';
+                const users=state.allUsers.length>0?state.allUsers:[
+                    {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
+                    {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false},
+                    {phone:'+79363334455',name:'Елена',username:'elena',avatar:'👩',online:true},
+                    {phone:'+79991112233',name:'🤖 Бот',username:'bot',avatar:'🤖',online:true}
+                ];
+                const available=users.filter(u=>u.phone!==state.user.phone);
+                overlay.innerHTML=`<div class="modal"><div class="modal-header"><h3>🔍 Поиск людей</h3><button class="modal-close" id="mc">✕</button></div>
+                <div class="input-group"><input type="text" id="searchInput" placeholder="Введите @username" autofocus></div>
+                <div id="results">${available.map((u,i)=>`<div class="user-list-item" data-phone="${u.phone}"><div class="avatar" style="width:44px;height:44px;font-size:1.3rem;">${u.avatar}</div><div style="flex:1;"><div style="font-weight:600;">${u.name}</div><div style="color:var(--blue);">@${u.username}</div></div><span>${u.online?'🟢':'⚫'}</span></div>`).join('')}</div></div>`;
+                document.body.appendChild(overlay);
+                const close=()=>overlay.remove();
+                overlay.querySelector('#mc').addEventListener('click',close);
+                overlay.addEventListener('click',e=>{ if(e.target===overlay) close(); });
+                overlay.querySelector('#searchInput').focus();
+                overlay.querySelector('#searchInput').addEventListener('input',function(){
+                    const q=this.value.toLowerCase().replace('@','');
+                    const res=overlay.querySelector('#results');
+                    const found=available.filter(u=>u.username?.toLowerCase().includes(q)||u.name?.toLowerCase().includes(q));
+                    res.innerHTML=found.length?found.map(u=>`<div class="user-list-item" data-phone="${u.phone}"><div class="avatar" style="width:44px;height:44px;font-size:1.3rem;">${u.avatar}</div><div style="flex:1;"><div style="font-weight:600;">${u.name}</div><div style="color:var(--blue);">@${u.username}</div></div><span>${u.online?'🟢':'⚫'}</span></div>`).join(''):'<p style="text-align:center;color:var(--text2);padding:16px;">Никого не найдено</p>';
+                    res.querySelectorAll('.user-list-item').forEach(item=>{ item.addEventListener('click',function(){ startChat(this.dataset.phone); close(); }); });
+                });
+                overlay.querySelectorAll('#results .user-list-item').forEach(item=>{ item.addEventListener('click',function(){ startChat(this.dataset.phone); close(); }); });
+            }
+
+            function showContactsModal() {
+                const overlay=document.createElement('div'); overlay.className='modal-overlay';
+                const users=state.allUsers.length>0?state.allUsers:[
+                    {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
+                    {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false}
+                ];
+                const available=users.filter(u=>u.phone!==state.user.phone);
+                overlay.innerHTML=`<div class="modal"><div class="modal-header"><h3>👥 Контакты</h3><button class="modal-close" id="mc">✕</button></div>
+                ${available.map(u=>{ const hasChat=state.chats.some(c=>c.type==='private'&&c.participants.includes(u.phone)&&c.participants.includes(state.user.phone)); return `<div class="user-list-item" data-phone="${u.phone}"><div class="avatar" style="width:44px;height:44px;font-size:1.3rem;">${u.avatar}</div><div style="flex:1;"><div style="font-weight:600;">${u.name}</div><div style="color:var(--blue);">@${u.username}</div></div><button class="btn btn-sm btn-primary" style="width:auto">${hasChat?'💬 Открыть':'➕ Чат'}</button></div>`; }).join('')}</div>`;
+                document.body.appendChild(overlay);
+                const close=()=>overlay.remove();
+                overlay.querySelector('#mc').addEventListener('click',close);
+                overlay.addEventListener('click',e=>{ if(e.target===overlay) close(); });
+                overlay.querySelectorAll('.user-list-item').forEach(item=>{ item.addEventListener('click',function(){ startChat(this.dataset.phone); close(); }); });
+            }
+
+            function startChat(phone) {
+                const chatId='chat_'+[state.user.phone,phone].sort().join('_');
+                if(state.chats.some(c=>c.id===chatId)){ state.currentChat=chatId; render(); return; }
+                const other=state.allUsers.find(u=>u.phone===phone)||{name:'Контакт',username:'user'};
+                state.chats.push({id:chatId,type:'private',participants:[state.user.phone,phone],unread:{},pinned:false});
+                state.messages[chatId]=[{id:genId(),sender:state.user.phone,text:`👋 Привет, @${other.username}!`,time:Date.now(),senderName:state.user.name,senderUsername:state.user.username,type:'text',deleted:false}];
+                state.currentChat=chatId; save(); render(); toast(`Чат с @${other.username} создан!`,'success');
+            }
+
+            function renderChatList() {
+                const ctr=document.getElementById('chatList'); if(!ctr||!state.user) return;
+                const up=state.user.phone;
+                let chats=state.chats.filter(c=>c.participants.includes(up)||c.isGeneral||c.id==='bot_chat');
+                chats.sort((a,b)=>{ if(a.pinned&&!b.pinned) return -1; if(!a.pinned&&b.pinned) return 1; const la=(state.messages[a.id]||[]).slice(-1)[0]; const lb=(state.messages[b.id]||[]).slice(-1)[0]; return (lb?.time||0)-(la?.time||0); });
+                ctr.innerHTML=chats.map(c=>{
+                    let name,avatar;
+                    if(c.isGeneral){ name='🌍 Общий чат'; avatar='🌍'; }
+                    else if(c.id==='bot_chat'){ name='🤖 Бот'; avatar='🤖'; }
+                    else if(c.type==='private'){ const o=c.participants.find(p=>p!==up); const u=state.allUsers.find(x=>x.phone===o)||{name:'Контакт',avatar:'👤'}; name=u.name; avatar=u.avatar; }
+                    else { name=c.name||'Группа'; avatar=c.avatar||'👥'; }
+                    const msgs=(state.messages[c.id]||[]).filter(m=>!m.deleted); const last=msgs[msgs.length-1];
+                    return `<div class="chat-item ${c.id===state.currentChat?'active':''}" data-chat="${c.id}"><div class="avatar" style="width:44px;height:44px;font-size:1.3rem;">${avatar}</div><div class="chat-item-info"><div style="display:flex;justify-content:space-between;"><span class="chat-item-name">${name}</span><span style="font-size:0.65rem;color:var(--text2);">${last?fTime(last.time):''}</span></div><div class="chat-item-msg">${last?last.text.substring(0,25):'Нет сообщений'}${c.unread&&c.unread[up]?`<span class="unread-badge">${c.unread[up]}</span>`:''}</div></div></div>`;
+                }).join('');
+                ctr.querySelectorAll('.chat-item').forEach(i=>i.addEventListener('click',()=>openChat(i.dataset.chat)));
+            }
+
+            function openChat(chatId) {
+                state.currentChat=chatId;
+                const chat=state.chats.find(c=>c.id===chatId); if(!chat||!state.user) return;
+                if(chat.unread) chat.unread[state.user.phone]=0;
+                let name,avatar;
+                if(chat.isGeneral){ name='🌍 Общий чат'; avatar='🌍'; }
+                else if(chatId==='bot_chat'){ name='🤖 Бот'; avatar='🤖'; }
+                else if(chat.type==='private'){ const o=chat.participants.find(p=>p!==state.user.phone); const u=state.allUsers.find(x=>x.phone===o)||{name:'Контакт',avatar:'👤'}; name=u.name; avatar=u.avatar; }
+                else { name=chat.name||'Группа'; avatar=chat.avatar||'👥'; }
+                document.getElementById('chatAvatar').textContent=avatar;
+                document.getElementById('chatName').textContent=name;
+                document.getElementById('chatStatus').textContent=chat.isGeneral?`${state.onlineUsers.length} онлайн`:'';
+                renderMessages(); renderChatList(); save();
+                if(window.innerWidth<=768) document.getElementById('sidebar').classList.remove('open');
+            }
+
+            function renderMessages() {
+                const ctr=document.getElementById('messagesArea'); if(!ctr||!state.currentChat) return;
+                const msgs=(state.messages[state.currentChat]||[]).filter(m=>!m.deleted);
+                if(!msgs.length){ ctr.innerHTML='<div class="empty-state"><i class="fas fa-comment-slash"></i><p>Нет сообщений</p></div>'; return; }
+                ctr.innerHTML=msgs.map(m=>{ const isMe=m.sender===state.user.phone; return `<div class="msg ${isMe?'out':'in'}"><div class="msg-bubble">${!isMe?`<div class="msg-sender">${m.senderName||'Пользователь'} @${m.senderUsername||''}</div>`:''}${m.text}<div class="msg-time">${fTime(m.time)}${isMe?' ✓':''}</div></div></div>`; }).join('');
+                setTimeout(()=>ctr.scrollTop=ctr.scrollHeight,50);
+            }
+
+            init();
+            console.log('🔥 KChat Pro готов!');
+        })();
     </script>
 </body>
 </html>
