@@ -1,26 +1,478 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>KChat Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KChat • Мессенджер</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+        body{background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh}
+        .container{background:white;border-radius:16px;padding:20px;width:90%;max-width:500px;box-shadow:0 4px 16px rgba(0,0,0,0.1)}
+        h1{text-align:center;color:#667eea;margin-bottom:16px}
+        input,button{padding:12px;border-radius:8px;font-size:16px;width:100%;margin:6px 0}
+        input{border:1px solid #ddd}
+        button{background:#667eea;color:white;border:none;cursor:pointer;font-weight:bold}
+        button:hover{background:#5a6fd6}
+        button.green{background:#31a24c}
+        button.orange{background:#ff9f43}
+        button.red{background:#ff4444}
+        .msg{background:#f0f0f0;padding:8px 12px;border-radius:8px;margin:4px 0;word-break:break-word}
+        .msg .sender{font-weight:bold;color:#667eea;font-size:12px}
+        .msg .time{font-size:10px;color:#999;float:right}
+        #messages{max-height:400px;overflow-y:auto;margin:12px 0;padding:8px;background:#fafafa;border-radius:8px}
+        .tabs{display:flex;gap:4px;margin:8px 0;flex-wrap:wrap}
+        .tab{flex:1;min-width:60px;padding:8px;text-align:center;background:#eee;border-radius:6px;cursor:pointer;font-size:12px}
+        .tab.active{background:#667eea;color:white}
+        #status{text-align:center;font-size:12px;margin:4px 0}
+        .online{color:#31a24c}
+        .offline{color:#999}
+        .user-row{display:flex;align-items:center;justify-content:space-between;padding:8px;margin:2px 0;background:#f9f9f9;border-radius:6px;font-size:14px}
+        .user-row:hover{background:#eee}
+    </style>
 </head>
 <body>
-    <h1>KChat работает!</h1>
-    <p>Если ты это видишь — GitHub Pages работает.</p>
-    <p>Сервер: kchat-j89m.onrender.com</p>
-    
+    <div class="container" id="app"></div>
+
     <script>
-        document.body.innerHTML += '<p style="color:green">✅ JavaScript работает!</p>';
-        
-        // Проверка сервера
-        fetch('https://kchat-j89m.onrender.com')
-            .then(r => r.text())
-            .then(data => {
-                document.body.innerHTML += '<p style="color:green">✅ Сервер отвечает: ' + data + '</p>';
-            })
-            .catch(err => {
-                document.body.innerHTML += '<p style="color:red">❌ Сервер недоступен</p>';
+        const SERVER_URL = 'https://kchat-j89m.onrender.com';
+        let socket;
+        let currentUser = null;
+        let currentChat = 'general';
+        let messages = {};
+        let allUsers = [];
+        let chats = [];
+
+        // ====== ПОДКЛЮЧЕНИЕ К СЕРВЕРУ ======
+        function connectServer() {
+            try {
+                socket = io(SERVER_URL);
+                
+                socket.on('connect', () => {
+                    console.log('✅ Подключены к серверу');
+                    updateStatus(true);
+                    if (currentUser) registerOnServer();
+                });
+
+                socket.on('disconnect', () => updateStatus(false));
+
+                socket.on('users:update', (users) => {
+                    if (users && users.length > 0) allUsers = users;
+                    updateStatus(true);
+                });
+
+                socket.on('message:general', (data) => {
+                    if (!messages['general']) messages['general'] = [];
+                    messages['general'].push({
+                        id: Date.now().toString(),
+                        sender: data.fromPhone,
+                        text: data.text,
+                        time: data.time || Date.now(),
+                        senderName: data.fromName || 'Пользователь',
+                        senderUsername: data.fromUsername || 'user'
+                    });
+                    saveData();
+                    if (currentChat === 'general') renderMessages();
+                });
+
+                socket.on('message:private', (data) => {
+                    const chatId = data.chatId;
+                    if (!messages[chatId]) messages[chatId] = [];
+                    messages[chatId].push({
+                        id: Date.now().toString(),
+                        sender: data.fromPhone,
+                        text: data.text,
+                        time: data.time || Date.now(),
+                        senderName: data.fromName || 'Пользователь',
+                        senderUsername: data.fromUsername || 'user'
+                    });
+                    saveData();
+                    if (currentChat === chatId) renderMessages();
+                    renderChatList();
+                });
+
+                socket.on('user:searchResults', (results) => {
+                    if (results && results.length > 0) allUsers = results;
+                });
+
+            } catch(e) {
+                console.log('Сервер недоступен:', e.message);
+                updateStatus(false);
+            }
+        }
+
+        function registerOnServer() {
+            if (socket && socket.connected && currentUser) {
+                socket.emit('register', {
+                    phone: currentUser.phone,
+                    name: currentUser.name,
+                    username: currentUser.username,
+                    avatar: currentUser.avatar
+                });
+            }
+        }
+
+        function updateStatus(connected) {
+            const el = document.getElementById('status');
+            if (el) {
+                el.innerHTML = connected ? '<span class="online">🟢 Сервер подключен</span>' : '<span class="offline">⚫ Локальный режим</span>';
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('kchat_msgs', JSON.stringify(messages));
+            localStorage.setItem('kchat_chats', JSON.stringify(chats));
+        }
+
+        function loadData() {
+            try {
+                const msgs = localStorage.getItem('kchat_msgs');
+                const chts = localStorage.getItem('kchat_chats');
+                if (msgs) messages = JSON.parse(msgs);
+                if (chts) chats = JSON.parse(chts);
+            } catch(e) {}
+            
+            if (!messages['general']) messages['general'] = [];
+            if (!messages['bot_chat']) {
+                messages['bot_chat'] = [{
+                    id: 'welcome',
+                    sender: '+79991112233',
+                    text: '👋 Привет! Я бот. Используй поиск чтобы найти людей!',
+                    time: Date.now(),
+                    senderName: '🤖 Бот',
+                    senderUsername: 'bot'
+                }];
+            }
+        }
+
+        // ====== АВТОРИЗАЦИЯ ======
+        function showAuth() {
+            loadData();
+            document.getElementById('app').innerHTML = `
+                <h1>🚀 KChat</h1>
+                <p style="text-align:center;color:#666;margin-bottom:12px">Поиск по @username • Общий чат • Личные сообщения</p>
+                <input type="tel" id="phoneInput" placeholder="Номер телефона" value="+79001234567">
+                <input type="text" id="codeInput" placeholder="Код подтверждения" value="12345" maxlength="5">
+                <input type="text" id="nameInput" placeholder="Ваше имя" value="Александр">
+                <input type="text" id="usernameInput" placeholder="@username" value="alex">
+                <button onclick="login()">🚀 Войти</button>
+                <p style="text-align:center;color:#999;font-size:12px;margin-top:8px">Код: 12345 | Готовые: alex, maria, dima, elena</p>
+            `;
+        }
+
+        function login() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            const code = document.getElementById('codeInput').value.trim();
+            const name = document.getElementById('nameInput').value.trim();
+            const username = document.getElementById('usernameInput').value.trim();
+
+            if (!phone || code !== '12345') return alert('Код: 12345');
+            if (!name || !username) return alert('Заполните все поля');
+
+            currentUser = { phone, name, username, avatar: '😎', status: 'В сети' };
+            localStorage.setItem('kchat_user', JSON.stringify(currentUser));
+            
+            connectServer();
+            registerOnServer();
+            showMain();
+        }
+
+        // ====== ГЛАВНЫЙ ЭКРАН ======
+        function showMain() {
+            if (!currentUser) { showAuth(); return; }
+
+            document.getElementById('app').innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <h2 style="margin:0;font-size:18px">💬 @${currentUser.username}</h2>
+                    <span style="font-size:12px">${currentUser.name}</span>
+                </div>
+                <div id="status">Подключение...</div>
+                <div class="tabs" id="tabs">
+                    <div class="tab active" data-chat="general">🌍 Общий</div>
+                    <div class="tab" data-chat="bot_chat">🤖 Бот</div>
+                </div>
+                <div id="chatTitle" style="font-weight:bold;margin:6px 0;font-size:15px"></div>
+                <div id="messages"></div>
+                <div style="display:flex;gap:8px">
+                    <input type="text" id="msgInput" placeholder="Сообщение..." style="flex:1">
+                    <button onclick="sendMessage()" style="width:auto;padding:12px 20px">➤</button>
+                </div>
+                <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+                    <button onclick="showSearch()" class="green" style="width:auto;font-size:13px;padding:8px 12px">🔍 Поиск людей</button>
+                    <button onclick="showUsers()" class="orange" style="width:auto;font-size:13px;padding:8px 12px">👥 Контакты</button>
+                    <button onclick="logout()" class="red" style="width:auto;font-size:13px;padding:8px 12px">🚪</button>
+                </div>
+                <div id="chatList" style="margin-top:8px"></div>
+            `;
+
+            updateStatus(socket && socket.connected);
+            updateChatTitle();
+            renderMessages();
+            renderChatList();
+            renderChatTabs();
+
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentChat = tab.dataset.chat;
+                    updateChatTitle();
+                    renderMessages();
+                });
             });
+
+            // Enter для отправки
+            const msgInput = document.getElementById('msgInput');
+            if (msgInput) {
+                msgInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') sendMessage();
+                });
+            }
+        }
+
+        function updateChatTitle() {
+            const el = document.getElementById('chatTitle');
+            if (!el) return;
+            const titles = { 'general': '🌍 Общий чат', 'bot_chat': '🤖 Чат с ботом' };
+            el.textContent = titles[currentChat] || '💬 Чат';
+        }
+
+        function renderChatTabs() {
+            const container = document.getElementById('tabs');
+            if (!container) return;
+            
+            // Добавляем вкладки для личных чатов
+            const personalChats = chats.filter(c => c.type === 'private');
+            personalChats.forEach(chat => {
+                const other = chat.participants.find(p => p !== currentUser.phone);
+                const user = allUsers.find(u => u.phone === other) || { name: 'Контакт' };
+                const tab = document.createElement('div');
+                tab.className = 'tab';
+                tab.dataset.chat = chat.id;
+                tab.textContent = '💬 ' + user.name.split(' ')[0];
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentChat = chat.id;
+                    updateChatTitle();
+                    renderMessages();
+                });
+                container.appendChild(tab);
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const text = input.value.trim();
+            if (!text || !currentUser) return;
+
+            const msg = {
+                id: Date.now().toString(),
+                sender: currentUser.phone,
+                text: text,
+                time: Date.now(),
+                senderName: currentUser.name,
+                senderUsername: currentUser.username
+            };
+
+            if (!messages[currentChat]) messages[currentChat] = [];
+            messages[currentChat].push(msg);
+            renderMessages();
+            input.value = '';
+            saveData();
+
+            // Отправка через сервер
+            if (socket && socket.connected) {
+                if (currentChat === 'general') {
+                    socket.emit('message:general', {
+                        text: text,
+                        fromPhone: currentUser.phone,
+                        fromName: currentUser.name,
+                        fromUsername: currentUser.username
+                    });
+                } else {
+                    const otherPhone = currentChat === 'bot_chat' ? '+79991112233' : 
+                        (chats.find(c => c.id === currentChat)?.participants?.find(p => p !== currentUser.phone));
+                    if (otherPhone) {
+                        socket.emit('message:send', {
+                            to: otherPhone,
+                            chatId: currentChat,
+                            text: text,
+                            fromPhone: currentUser.phone,
+                            fromName: currentUser.name,
+                            fromUsername: currentUser.username
+                        });
+                    }
+                }
+            }
+
+            // Ответ бота
+            if (currentChat === 'bot_chat') {
+                setTimeout(() => {
+                    const replies = ['👍', 'Интересно!', 'Понял', 'Ищи людей через поиск 🔍', 'Общий чат ждёт!'];
+                    messages[currentChat].push({
+                        id: Date.now().toString(),
+                        sender: '+79991112233',
+                        text: replies[Math.floor(Math.random() * replies.length)],
+                        time: Date.now(),
+                        senderName: '🤖 Бот',
+                        senderUsername: 'bot'
+                    });
+                    saveData();
+                    renderMessages();
+                }, 1000);
+            }
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messages');
+            if (!container) return;
+
+            const msgs = messages[currentChat] || [];
+            if (msgs.length === 0) {
+                container.innerHTML = '<p style="color:#999;text-align:center;padding:20px">Нет сообщений. Напишите первое!</p>';
+                return;
+            }
+
+            container.innerHTML = msgs.map(m => {
+                const isMe = m.sender === currentUser.phone;
+                return `<div class="msg" style="background:${isMe?'#667eea':'#f0f0f0'};color:${isMe?'white':'black'}">
+                    <div class="sender" style="color:${isMe?'rgba(255,255,255,0.8)':'#667eea'}">${isMe?'Я':m.senderName||'Пользователь'} @${m.senderUsername||''}</div>
+                    ${m.text}
+                    <div class="time">${new Date(m.time).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</div>
+                </div>`;
+            }).join('');
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderChatList() {
+            const container = document.getElementById('chatList');
+            if (!container) return;
+
+            const personal = chats.filter(c => c.type === 'private' && c.id !== currentChat);
+            if (personal.length === 0) {
+                container.innerHTML = '<p style="color:#999;font-size:11px;margin-top:8px">Нет личных чатов. Нажмите 🔍 Поиск</p>';
+                return;
+            }
+
+            container.innerHTML = '<b style="font-size:12px">Ваши чаты:</b>' + personal.map(c => {
+                const other = c.participants.find(p => p !== currentUser.phone);
+                const user = allUsers.find(u => u.phone === other) || { name: 'Контакт', username: 'user' };
+                return `<button onclick="openChat('${c.id}')" style="width:auto;font-size:11px;padding:6px 8px;margin:2px;display:inline-block">💬 ${user.name} (@${user.username})</button>`;
+            }).join('');
+        }
+
+        function openChat(chatId) {
+            currentChat = chatId;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            showMain();
+        }
+
+        // ====== ПОИСК ======
+        function showSearch() {
+            const list = allUsers.length > 0 ? allUsers : [
+                {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
+                {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false},
+                {phone:'+79363334455',name:'Елена',username:'elena',avatar:'👩',online:true},
+                {phone:'+79991112233',name:'🤖 Бот',username:'bot',avatar:'🤖',online:true}
+            ];
+
+            const avaliable = list.filter(u => u.phone !== currentUser.phone);
+            
+            const html = avaliable.map((u, i) => 
+                `${i+1}. ${u.name} @${u.username} ${u.online?'🟢':'⚫'}`
+            ).join('\n');
+
+            const choice = prompt('🔍 Доступные пользователи:\n\n' + html + '\n\nВведите номер чтобы начать чат:');
+            
+            if (choice && avaliable[parseInt(choice)-1]) {
+                const user = avaliable[parseInt(choice)-1];
+                startChat(user.phone, user.name, user.username);
+            }
+        }
+
+        function showUsers() {
+            const list = allUsers.length > 0 ? allUsers : [
+                {phone:'+79161112233',name:'Мария',username:'maria',avatar:'👩',online:true},
+                {phone:'+79262223344',name:'Дмитрий',username:'dima',avatar:'👨',online:false}
+            ];
+
+            let html = '<div style="max-height:200px;overflow-y:auto">';
+            list.filter(u => u.phone !== currentUser.phone).forEach(u => {
+                const hasChat = chats.some(c => c.type==='private' && c.participants.includes(u.phone));
+                html += `<div class="user-row">
+                    <span>${u.avatar} <b>${u.name}</b> @${u.username} ${u.online?'🟢':'⚫'}</span>
+                    <button onclick="startChat('${u.phone}','${u.name}','${u.username}')" style="width:auto;font-size:11px;padding:4px 8px">${hasChat?'💬 Открыть':'➕ Чат'}</button>
+                </div>`;
+            });
+            html += '</div>';
+
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000';
+            overlay.innerHTML = `<div style="background:white;padding:20px;border-radius:12px;width:90%;max-width:400px">
+                <h3>👥 Контакты</h3>${html}
+                <button onclick="this.parentElement.parentElement.remove()" style="margin-top:8px">Закрыть</button>
+            </div>`;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', (e) => { if(e.target===overlay) overlay.remove(); });
+        }
+
+        function startChat(phone, name, username) {
+            const chatId = 'chat_' + [currentUser.phone, phone].sort().join('_');
+            
+            if (chats.some(c => c.id === chatId)) {
+                currentChat = chatId;
+                showMain();
+                return;
+            }
+
+            chats.push({
+                id: chatId,
+                type: 'private',
+                participants: [currentUser.phone, phone]
+            });
+
+            messages[chatId] = [{
+                id: Date.now().toString(),
+                sender: currentUser.phone,
+                text: `👋 Привет, @${username}!`,
+                time: Date.now(),
+                senderName: currentUser.name,
+                senderUsername: currentUser.username
+            }];
+
+            currentChat = chatId;
+            saveData();
+            showMain();
+        }
+
+        function logout() {
+            if (confirm('Выйти?')) {
+                currentUser = null;
+                currentChat = 'general';
+                localStorage.removeItem('kchat_user');
+                showAuth();
+            }
+        }
+
+        // ====== ЗАПУСК ======
+        const saved = localStorage.getItem('kchat_user');
+        if (saved) {
+            try {
+                currentUser = JSON.parse(saved);
+                loadData();
+                connectServer();
+                showMain();
+            } catch(e) {
+                showAuth();
+            }
+        } else {
+            showAuth();
+        }
+
+        console.log('✅ KChat готов! Сервер: ' + SERVER_URL);
     </script>
 </body>
 </html>
