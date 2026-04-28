@@ -1,18 +1,16 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: '*' }
+const io = new Server(server, { cors: { origin: '*' } });
+
+app.get('/', (req, res) => {
+    res.send('KChat Server is running!');
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ====== БАЗА ПОЛЬЗОВАТЕЛЕЙ ======
-const users = new Map(); // phone -> { phone, name, username, avatar, online }
+const users = new Map();
 
 // Демо пользователи
 users.set('+79991112233', { phone: '+79991112233', name: '🤖 Бот', username: 'bot', avatar: '🤖', online: true });
@@ -22,80 +20,46 @@ users.set('+79262223344', { phone: '+79262223344', name: 'Дмитрий', usern
 users.set('+79363334455', { phone: '+79363334455', name: 'Елена', username: 'elena', avatar: '👩', online: true });
 
 io.on('connection', (socket) => {
-    console.log('🟢 Подключился:', socket.id);
+    console.log('🟢 User connected:', socket.id);
 
-    // ====== РЕГИСТРАЦИЯ ======
     socket.on('register', (data) => {
-        const { phone, name, username, avatar } = data;
-        
-        // Проверяем уникальность username
-        const exist = Array.from(users.values()).find(u => u.username === username && u.phone !== phone);
-        if (exist) {
-            socket.emit('register:error', 'Username занят');
-            return;
+        if (!users.has(data.phone)) {
+            users.set(data.phone, {
+                phone: data.phone,
+                name: data.name,
+                username: data.username,
+                avatar: data.avatar,
+                online: true
+            });
         }
-
-        users.set(phone, { phone, name, username, avatar, online: true, socketId: socket.id });
-        socket.phone = phone;
-        
-        // Отправляем обновлённый список всем
-        io.emit('users:update', Array.from(users.values()).map(u => ({
-            phone: u.phone, name: u.name, username: u.username,
-            avatar: u.avatar, online: u.online
-        })));
-
-        socket.emit('register:success', { phone, name, username, avatar });
-        socket.broadcast.emit('user:online', { phone, name, username, avatar });
-        
-        console.log(`✅ Зарегистрирован: @${username} (${name})`);
+        socket.phone = data.phone;
+        io.emit('users:update', Array.from(users.values()));
+        console.log('✅ Registered:', data.username);
     });
 
-    // ====== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ======
     socket.on('user:search', (query) => {
         const q = query.toLowerCase().replace('@', '');
         const results = Array.from(users.values())
             .filter(u => u.phone !== socket.phone)
-            .filter(u => u.username?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q))
-            .map(u => ({
-                phone: u.phone, name: u.name, username: u.username,
-                avatar: u.avatar, online: u.online
-            }));
-        
+            .filter(u => u.username?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q));
         socket.emit('user:searchResults', results);
-        console.log(`🔍 Поиск "${query}": найдено ${results.length}`);
     });
 
-    // ====== ОТПРАВКА СООБЩЕНИЯ ======
     socket.on('message:send', (data) => {
-        const sender = users.get(socket.phone);
-        const receiver = users.get(data.to);
-        
-        if (receiver && receiver.socketId) {
-            io.to(receiver.socketId).emit('message:private', {
-                chatId: data.chatId,
-                fromPhone: socket.phone,
-                fromName: sender?.name,
-                fromUsername: sender?.username,
-                text: data.text,
-                time: Date.now()
-            });
-            console.log(`📩 Сообщение от @${sender?.username} -> @${receiver?.username}`);
-        }
+        io.emit('message:private', {
+            chatId: data.chatId,
+            fromPhone: socket.phone,
+            text: data.text,
+            time: Date.now()
+        });
     });
 
-    // ====== ОТКЛЮЧЕНИЕ ======
     socket.on('disconnect', () => {
-        const user = users.get(socket.phone);
-        if (user) {
-            user.online = false;
-            user.socketId = null;
-            io.emit('user:offline', { phone: socket.phone });
-            console.log(`🔴 Отключился: @${user.username}`);
-        }
+        console.log('🔴 User disconnected:', socket.id);
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log('🚀 KChat Server running on port', PORT);
 });
